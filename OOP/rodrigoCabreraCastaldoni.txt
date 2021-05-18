@@ -1,0 +1,131 @@
+1 - Como se pode acessar o atributo da seguinte classe?
+
+```python
+class MyClass:
+    
+    def __init__(self):
+        self.my_attr = "Acessado"
+```
+
+- a. MyClass()["my_attr"]
+- b. MyClass()[my_attr]
+- *c. MyClass().my_attr
+- d. MyClass()(my_attr)
+
+
+2 - O que o método '__getitem__' implementado na seguinte classe faz?
+
+```python
+class MyClass:
+    
+    def __init__(self):
+        self.my_attr = "Acessado"
+        
+    def __getitem__(self,name):
+        return getattr(self,name)
+```
+
+- *a. Permite acesso aos atributos por string com o operador [] (exemplo: class_istance["attr"]).
+- b. Permite mudar os nomes dos atributos por string com o operador [] (exemplo: class_istance["old_attr", "new_attr"]).
+- c. Permite acesso aos atributos por string com o operador {} (exemplo: class_istance{"attr"}).
+- d. Trata o caso de acesso de atributos inexistentes.
+
+
+3 - A respeito das diferenças entre atributos de classes e atributos de instâncias, quais alternativas estão corretas? 
+
+
+- V. Um dos casos de uso de atributos de classe é o armazenamento de constantes.
+- V. Normalmente, não é aconselhado atributos de classes mutáveis.
+- F. Um atributo da instância pode ser acessado pela classe.
+- V. Uma instância pode acessar seus atributos e os atributos de classe.
+
+
+4 - Preencha as lacunas para inicializar corretamente
+
+```python
+class Pessoa:
+    
+    def __init__(self, name, age):
+        self.name = name
+        self.age = age
+        
+class CientistaDados(Pessoa): 
+    
+    def __init__(self, name, age, specialization):
+        {{GAP}}.__init__({{GAP}}, {{GAP}})
+        self.specialization = specialization 
+```
+
+alternativas: [name, super, age];
+aceitas:[
+    [super],
+    [name],
+    [age]
+]
+
+
+5 - Imagine que seu chefe pediu para você fazer a modelagem de dados de uma automobiliária. Você, como programador experiente decide começar a modelagem fazendo uma classe Veículos, que representa motos, carros e caminhões. Quais são os atributos que melhor representam essa classe?
+
+- a. quilometragem, tamaho_guidao, largura
+- b. capacidade_armazenamento, capacidade_pessoas, tem_arcondicionado
+- c. tamaho_guidao, quantidade_rodas, altura
+- *d. quantidade_rodas, potencia, capacidade_pessoas.
+
+
+6 - Sobre atributos privados em python, quais alternativas estão corretas?
+
+- V. Não é possível fazer atributos privados em python.
+- F. Pode-se importar private da biblioteca padrão functools para tornar atributos privados.
+- F. Todos atributos são privados por padrão e é necessário criar getters e setters para manipula-los.
+- V. Indica-se que um atributo é privado com um ou dois underscore ('_') antes do nome da variável.
+
+
+7 - Para que utilizamos a palavra reservada self no contexto de classes em python? 
+
+- a. A palavra self é uma convenção entre programadores, não sendo necessária quando trabalha-se com classes.
+- *b. Essa palavra é utilizada para indicar uma instância da classe. 
+- c. Essa palavra é utilizada para indicar a classe a qual a instância pertence. 
+- d. A palavra self indica que a classe pode criar mais de uma instância.
+
+
+8 - Você estava muito cansado do trablho e resolveu tirar férias em uma praia. Entretanto, você é apaixonado por programação e animais, e  rapidamente a seguinte pergunta passou pela sua cabeça. Será que eu consigo criar uma classe para modelar os Animais? Qual alternativa representa os atributos mais interessantes para sua classe?
+
+- a. andar, comer, voar.
+- b. altura, voar, sexo.
+- c. cor, nome, sexo.
+- *d. reino, familia, especie.
+
+
+9 - Qual a diferença entre o atributo __name e o atributo _age no seguinte código?
+
+```python
+class Pessoa:
+    
+    def __init__(self, name, age):
+        self._age = age
+        self.__name = name
+```
+
+- *a. Um único underscore indica ao programador que a variável é privada. Entretanto quando utiliza-se dois underscore o nome do atributo muda, isto é, dessa forma não consiguimos acessar o atributo utilizando somente o nome, como exemplo Pessoa(name, age).__name), dessa forma aumentando o nível de segurança da variável.
+- b. O atributo _age é privado e __name não é privado, ou seja, pode ser acessado.
+- c. Não existe diferença para o interpretador do python, isto é somente uma convenção entre os programadores python, onde um underscore indica que a variável pode ser alterada em runtime, enquanto que dois underscore indicam que a variável pode ser alterada durante o runtime do programa.
+- d. O atributo __name é privado e _age não é privado, ou seja, pode ser acessado.
+
+10 - Qual é o objetivo do atributo question no seguinte código?
+
+```python
+class Bus:
+    
+    question = set()
+
+    def __init__(self, passengers):
+        self.passengers = passengers
+        
+        for passenger in passengers:
+            Bus.question.add(passenger)
+```
+   
+- *a. O objetivo desse atributo é armazenar todos os passageiros que já andaram em pelo menos um ônibus.
+- b. O objetivo desse atributo é manter uma cópia dos passageiros de um ônibus especifico.
+- c. O objetivo desse atributo é gravar os passageiros em uma estrutura de dados diferente para rápido acesso.
+- d. Este código não roda, pois o atributo está errado, falta a palavra self precedendo o nome do atributo, assim como passengers.
