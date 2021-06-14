@@ -20,17 +20,36 @@ class Client:
         self.files = ",".join([os.path.basename(file_name) for file_name in files_path])
         print("Client criado")
 
-    def _receive(self):
-        pass
+    def _make_request(self):
+        while True:
+            try:
+                request = input("Digite a requisição [JOIN,LEAVE]:")
+                thread = threading.Thread(target=self._handle_write,args=(request,))
+                thread.start()
+                thread.join()
+
+            except KeyboardInterrupt as e:
+                break
+                
+    
+    def _handle_write(self,request):
+
+        if request == "JOIN":
+            self.join()
+        elif request == "LEAVE":
+            self.leave()
+        else:
+            return "Comando Invalido."
 
     def join(self):
         self.UDPClientSocket.sendto(f"JOIN: {self.files}".encode("utf-8"), self.SERVER_ID)
-        data, server =self.UDPClientSocket.recvfrom(self.BUFFER_SIZE)
+        data, _ = self.UDPClientSocket.recvfrom(self.BUFFER_SIZE)
         print(data.decode("utf-8"))
 
     def leave(self):
-        self.UDPClientSocket.sendto(f"LEAVE:", self.SERVER_ID)
-
+        self.UDPClientSocket.sendto(b"LEAVE:", self.SERVER_ID)
+        data, server = self.UDPClientSocket.recvfrom(self.BUFFER_SIZE)
+        print(data.decode("utf-8"))
         
 
 if __name__ == "__main__":
@@ -41,4 +60,4 @@ if __name__ == "__main__":
     client = Client(files_path)
     print(client.files)
     print(client.files_path)
-    client.join()
+    client._make_request()

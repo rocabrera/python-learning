@@ -4,3 +4,5 @@ A socket function or method that temporarily suspends your application is a bloc
 For example, accept(), connect(), send(), and recv() “block.” They don’t return immediately. 
 Blocking calls have to wait on system calls (I/O) to complete before they can return a value. 
 So you, the caller, are blocked until they’re done or a timeout or other error occurs.
+
+Eu preciso de um socket TCP no servidor?

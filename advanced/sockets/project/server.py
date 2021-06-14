@@ -19,9 +19,10 @@ class Servidor:
             try:
                 data, peer = self.UDPServerSocket.recvfrom(self.BUFFERSIZE)
                 request, msg = data.decode('utf-8').split(':')
-                response = self._handle_request(peer, request, msg)
-                self.UDPServerSocket.sendto(response,peer)
-                
+                #Criar uma thread para cada requisição de um cliente
+                thread = threading.Thread(target=self._handle_request,args=(peer, request, msg,))
+                thread.start()
+
             except KeyboardInterrupt as e:
                 """
                 No futuro eu devo tirar o client se algum erro acontecer
@@ -42,11 +43,14 @@ class Servidor:
         
     def _handle_join(self,peer,msg):
         self.peers[peer] = msg.strip().split(',')
-        return b"JOIN_OK"
+        self.UDPServerSocket.sendto(b"JOIN_OK\n",peer)
 
     def _handle_leave(self, peer):
-        self.peers.pop(peer)
-        return b"LEAVE_OK"
+        if peer in self.peers:
+            self.peers.pop(peer)
+            self.UDPServerSocket.sendto(b"LEAVE_OK\n",peer)
+        else:
+            self.UDPServerSocket.sendto(b"Primeiro de JOIN",peer)
 
 
 
