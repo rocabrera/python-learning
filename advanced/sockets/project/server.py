@@ -42,7 +42,11 @@ class Servidor:
             return self._handle_leave(peer)
         
     def _handle_join(self,peer,msg):
-        self.peers[peer] = msg.strip().split(',')
+        print()
+        peer_address, peer_port = peer
+        file_lst = msg.strip()
+        self.peers[peer] = file_lst.split(',')
+        print(f"Peer [{peer_address}]:{peer_port} adicionado com arquivos {file_lst}")
         self.UDPServerSocket.sendto(b"JOIN_OK\n",peer)
 
     def _handle_leave(self, peer):

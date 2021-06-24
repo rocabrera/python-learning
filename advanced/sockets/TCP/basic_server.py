@@ -17,7 +17,6 @@ Utiliza protocolo IPv4: AF_INET
 Utiliza protocolo IPv6: AF_INET6
 """
 
-
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 server.bind((HOST,PORT))
 server.listen()

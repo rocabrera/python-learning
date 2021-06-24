@@ -18,6 +18,7 @@ class Client:
         self.UDPClientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.files_path = files_path
         self.files = ",".join([os.path.basename(file_name) for file_name in files_path])
+        self.files2print = " ".join([os.path.basename(file_name) for file_name in files_path])
         print("Client criado")
 
     def _make_request(self):
@@ -45,6 +46,7 @@ class Client:
         self.UDPClientSocket.sendto(f"JOIN: {self.files}".encode("utf-8"), self.SERVER_ID)
         data, _ = self.UDPClientSocket.recvfrom(self.BUFFER_SIZE)
         print(data.decode("utf-8"))
+        print(f"Sou o peer[{self.SERVER_ID[0]}]:{self.SERVER_ID[1]} com arquivos {self.files2print}")
 
     def leave(self):
         self.UDPClientSocket.sendto(b"LEAVE:", self.SERVER_ID)
