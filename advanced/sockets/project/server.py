@@ -1,5 +1,6 @@
 import socket
 import threading
+from concurrent import futures
 # running locally
 from message import Message
 
@@ -49,10 +50,8 @@ class Servidor:
 
         if request == "JOIN":
             return self._handle_join(peer, msg)
-
         elif request == "LEAVE":
             return self._handle_leave(peer)
-
         elif request == "ALIVE_OK":
             self._handle_alive()
 
@@ -79,7 +78,7 @@ class Servidor:
         pass
 
     def broadcast(self):
-        thread_alive = threading.Timer(10, self._broadcast_alive)
+        thread_alive = threading.Timer(30, self._broadcast_alive)
         thread_alive.start()
         thread_alive.join()  # Espera thread_alive terminar
         self.broadcast()
@@ -87,7 +86,10 @@ class Servidor:
     def _broadcast_alive(self):
         print("Sending ALIVE")
         msg = Message("ALIVE")
+        # with futures.ThreadPoolExecutor(max_workers=5) as ex:
+        #     results = ex.map(task, range(1, 6), timeout=3)
         for peer in self.peers:
+            self.alive_timeout = 0
             self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer)
 
 

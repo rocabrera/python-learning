@@ -23,7 +23,7 @@ class Peer:
         self.UDPClientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
         # Preciso fazer bind aqui?
-        #self.UDPClientSocket.bind((self.HOST, self.PORT))
+        # self.UDPClientSocket.bind((self.HOST, self.PORT))
         self.files_path = files_path
         self.files = " ".join([os.path.basename(file_name)
                               for file_name in files_path])
@@ -94,7 +94,8 @@ if __name__ == "__main__":
 
     peer = Peer(files_path)
     print("ONLINE\n")
-    alive_thread = threading.Thread(target=peer._request)
-    alive_thread.start()
     listening_thread = threading.Thread(target=peer._receive)
+    alive_thread = threading.Thread(target=peer._request)
+
     listening_thread.start()
+    alive_thread.start()
