@@ -2,7 +2,7 @@ import os   # Utilitys do sistema operacional
 import sys  # Para pegar folder no qual os dados estão
 import glob  # Percorre com regex os files de um folder
 import json  # Utilizado para fazer parse da mensagem
-
+import time
 import socket
 import threading
 
@@ -27,6 +27,7 @@ class Peer:
         self.files_path = files_path
         self.files = " ".join([os.path.basename(file_name)
                               for file_name in files_path])
+        self.menu_str = "Digite a requisição [JOIN, SEARCH, LEAVE]:" 
 
     def _receive(self):
         while True:
@@ -39,57 +40,76 @@ class Peer:
 
     def _handle_request(self, server, recv_msg):
 
-        request = recv_msg["message"].strip("\n")
+        text_msg = recv_msg["message"].strip("\n")
 
-        if request == "JOIN_OK":
-            self._handle_join()
+        if recv_msg["type_msg"] == "OK":
 
-        elif request == "LEAVE_OK":
-            self._handle_leave()  # No futuro preciso desligar o client aqui
+            if text_msg == "JOIN_OK":
+                self._handle_join()
 
-        elif request == "ALIVE":
-            return self._handle_alive()
+            elif text_msg == "LEAVE_OK":
+                self._handle_leave()  # No futuro preciso desligar o client aqui
+
+            elif text_msg == "ALIVE":
+                return self._handle_alive()
+
+        elif recv_msg["type_msg"] == "SEARCH":
+
+            self._handle_search(text_msg)
 
     def _handle_join(self):
-        print(f"Sou o peer [{self.HOST}]:{self.PORT} com arquivos {self.files}")
+        print(f"Sou o peer [{self.HOST}]:{self.PORT} com arquivos {self.files}\n")
+
+    def _handle_search(self, msg):
+        print(f"Peers com arquivo solicitado: {msg}")
 
     def _handle_leave(self):
         sys.exit("Desconectado")
 
-    def _handle_alive(self):
-        print("ESTOU VIVO - TESTE")
-        msg = Message("ALIVE_OK:\n")
+    def _handle_alive(self):        
+        msg = Message("ALIVE_OK:\n", None)
         self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
 
     def _request(self):
         while True:
-            request = input("Digite a requisição [JOIN,LEAVE]:")
+            time.sleep(0.1)
+            request = input(self.menu_str)
             thread = threading.Thread(target=self._handle_write, args=(request,))
             thread.start()
             thread.join()
 
     def _handle_write(self, request):
 
-        if request == "JOIN":
+        if request.upper() == "JOIN":
             self.join()
-        elif request == "LEAVE":
+
+        elif request.upper() == "LEAVE":
             self.leave()
+
+        elif request.upper() == "SEARCH":
+            requested_file = input("Digite o nome do arquivo buscado:")
+            self.search(requested_file)
+
         else:
-            return "Comando Invalido."
+            print("Comando Invalido.")
+
+    def search(self, requested_file):
+        msg = Message(f"SEARCH: {requested_file}", None)
+        self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
 
     def join(self):
-        msg = Message(f"JOIN: {self.files}")
+        msg = Message(f"JOIN: {self.files}", None)
         self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
 
     def leave(self):
-        msg = Message("LEAVE:")
+        msg = Message("LEAVE:", None)
         self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
 
 
 if __name__ == "__main__":
 
     # file_folder_path = sys.argv[1]
-    file_folder_path = "data/files"
+    file_folder_path = "data/peer1"
     files_path = [file_name for file_name in glob.glob(f"{file_folder_path}/*.txt")]
 
     peer = Peer(files_path)

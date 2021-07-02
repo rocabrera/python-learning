@@ -1,6 +1,5 @@
 import socket
 import threading
-from concurrent import futures
 # running locally
 from message import Message
 
@@ -52,6 +51,10 @@ class Servidor:
             return self._handle_join(peer, msg)
         elif request == "LEAVE":
             return self._handle_leave(peer)
+
+        elif request == "SEARCH":
+            return self._handle_search(peer, msg)
+
         elif request == "ALIVE_OK":
             self._handle_alive()
 
@@ -61,17 +64,24 @@ class Servidor:
         if peer not in self.peers:
             self.peers[peer] = file_lst.split()  # Grava o peer no servidor
             print(f"Peer [{peer_address}]:{peer_port} adicionado com arquivos {file_lst}")
-            msg = Message("JOIN_OK\n")
+            msg = Message("JOIN_OK\n", "OK")
             self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer)
         else:
-            msg = Message("Você já está conectado\n")
+            msg = Message("Você já está conectado\n", "OK")
             self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer)
             print(f"Peer [{peer_address}]:{peer_port} já está conectado")
+
+    def _handle_search(self, peer_request, msg):
+        file_name = msg.strip()
+        print(f"Peer [{peer_request[0]}]:[{peer_request[1]}] solicitou arquivo {file_name}")
+        has_peers = [f"{peer[0]}:{peer[1]}" for peer in self.peers if file_name in self.peers[peer]]
+        msg = Message("[" + " ".join(has_peers) + "]", "SEARCH")
+        self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_request)
 
     def _handle_leave(self, peer):
         if peer in self.peers:
             self.peers.pop(peer)  # Retira o peer do servidor
-            msg = Message("LEAVE_OK\n")
+            msg = Message("LEAVE_OK\n", "OK")
             self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer)
 
     def _handle_alive(self):
@@ -85,7 +95,7 @@ class Servidor:
 
     def _broadcast_alive(self):
         print("Sending ALIVE")
-        msg = Message("ALIVE")
+        msg = Message("ALIVE", "OK")
         # with futures.ThreadPoolExecutor(max_workers=5) as ex:
         #     results = ex.map(task, range(1, 6), timeout=3)
         for peer in self.peers:
