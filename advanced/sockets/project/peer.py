@@ -11,23 +11,32 @@ from message import Message
 
 class Peer:
 
-    HOST = socket.gethostbyname(socket.gethostname())
-    PORT = 10510
+    MY_ADRESS = socket.gethostbyname(socket.gethostname())
 
     SERVER_ADDRESS = "127.0.1.1"
     SERVER_PORT = 10098
     SERVER = (SERVER_ADDRESS, SERVER_PORT)
-    BUFFERSIZE = 1024
+    BUFFERSIZE = 4096
 
-    def __init__(self, files_path):
+    def __init__(self, file_folder_path, files_path, port):
+        self.PORT = int(port)
         self.UDPClientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.TCPSocket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.TCPSocket.bind((self.MY_ADRESS, self.PORT))
+        self.TCPSocket.listen()
 
-        # Preciso fazer bind aqui?
-        # self.UDPClientSocket.bind((self.HOST, self.PORT))
+        self.network_peers = {}
+        self.file_folder_path = file_folder_path
         self.files_path = files_path
         self.files = " ".join([os.path.basename(file_name)
                               for file_name in files_path])
-        self.menu_str = "Digite a requisição [JOIN, SEARCH, LEAVE]:" 
+        self.menu_str = "Digite a requisição [JOIN, SEARCH, DOWNLOAD, LEAVE]:"
+
+    def _receive_download(self):
+        while True:
+            client, address = self.TCPSocket.accept()
+            msg = client.recv(1024).decode('ascii')
+            print(msg)
 
     def _receive(self):
         while True:
@@ -54,14 +63,40 @@ class Peer:
                 return self._handle_alive()
 
         elif recv_msg["type_msg"] == "SEARCH":
+            filename = recv_msg["file"]
+            self._handle_search(text_msg, filename)
 
-            self._handle_search(text_msg)
+        elif recv_msg["type_msg"] == "DOWNLOAD":
+            filename = recv_msg["file"]
+            package = recv_msg["info"]
+            self._handle_download(filename, package)
 
     def _handle_join(self):
-        print(f"Sou o peer [{self.HOST}]:{self.PORT} com arquivos {self.files}\n")
+        print(f"Sou o peer [{self.MY_ADRESS}]:{self.PORT} com arquivos {self.files}\n")
 
-    def _handle_search(self, msg):
+    def _handle_search(self, msg, filename):
+        parse_msg = msg.strip('[]').split()
+        for peer in parse_msg:
+            address, port = peer.split(':')
+            self.network_peers[(address, int(port))] = filename
         print(f"Peers com arquivo solicitado: {msg}")
+
+    def _handle_download(self, filename, package):
+        client_socket, address = self.TCPSocket.accept()
+
+        # client.send("NICK".encode('ascii'))
+        # nickname = client.recv(1024).decode('ascii')
+
+        file_path = os.path.join(self.file_folder_path, filename)
+        with open(file_path, "wb") as f:
+            while True:
+                bytes_read = client_socket.recv(self.BUFFERSIZE)
+                if not bytes_read:
+                    # nothing is received
+                    # file transmitting is done
+                    break
+                # write to the file the bytes we just received
+                f.write(package)
 
     def _handle_leave(self):
         sys.exit("Desconectado")
@@ -79,27 +114,68 @@ class Peer:
             thread.join()
 
     def _handle_write(self, request):
+        command, *msg = request.split()
+        command = command.upper()
 
-        if request.upper() == "JOIN":
+        if command == "JOIN":
             self.join()
 
-        elif request.upper() == "LEAVE":
+        elif command == "SEARCH":
+            msg_len = len(msg)
+            if msg_len == 0:
+                print("Faltou o nome do arquivo")
+            elif msg_len == 1:
+                self.search(msg[0])
+            else:
+                print("Somente 1 arquivo por vez")
+
+        elif command == "DOWNLOAD":
+            msg_len = len(msg)
+            if msg_len == 0:
+                print("Faltou o nome do arquivo")
+            elif msg_len == 1:
+                self.download(msg[0])
+            else:
+                print("Somente 1 arquivo por vez")
+
+        elif command == "LEAVE":
             self.leave()
-
-        elif request.upper() == "SEARCH":
-            requested_file = input("Digite o nome do arquivo buscado:")
-            self.search(requested_file)
-
         else:
             print("Comando Invalido.")
+
+    def join(self):
+        msg = Message(f"JOIN: {self.files}", "JOIN", None, self.PORT)
+        self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
 
     def search(self, requested_file):
         msg = Message(f"SEARCH: {requested_file}", None)
         self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
 
-    def join(self):
-        msg = Message(f"JOIN: {self.files}", None)
-        self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
+    def download(self, requested_file):
+        msg = Message(f"DOWNLOAD: {requested_file}", None)
+        for peer in self.network_peers:
+            if requested_file in self.network_peers[peer]:
+                print(peer)
+                s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                s.connect((peer[0],30000))
+                s.sendall(msg.to_json("utf-8"), peer)
+                return None
+
+        """
+            s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            s.connect(peer)
+            file_path = os.path.join(self.file_folder_path, requested_file)
+            with open(file_path, "rb") as f:
+                while True:
+                    # read the bytes from the file
+                    bytes_read = f.read(self.BUFFERSIZE)
+                    if not bytes_read:
+                        # file transmitting is done
+                        break
+                    # we use sendall to assure transimission in busy networks
+                    s.sendall(msg.to_json("utf-8"))
+            s.close()
+        """
 
     def leave(self):
         msg = Message("LEAVE:", None)
@@ -108,11 +184,11 @@ class Peer:
 
 if __name__ == "__main__":
 
-    # file_folder_path = sys.argv[1]
-    file_folder_path = "data/peer1"
+    _, file_folder_path, port = sys.argv
+    # file_folder_path = "data/peer1"
     files_path = [file_name for file_name in glob.glob(f"{file_folder_path}/*.txt")]
 
-    peer = Peer(files_path)
+    peer = Peer(file_folder_path, files_path, port)
     print("ONLINE\n")
     listening_thread = threading.Thread(target=peer._receive)
     alive_thread = threading.Thread(target=peer._request)
