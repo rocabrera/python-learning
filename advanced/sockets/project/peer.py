@@ -41,7 +41,7 @@ class Peer:
         self.file_folder_path:str = file_folder_path # Guarda pasta onde os arquvios de áudio estão.
         files_path = [file_name for file_name in glob.glob(f"{file_folder_path}/*")] # Lista todos os arquivos da pasta
         self.files:str = " ".join([os.path.basename(file_name) for file_name in files_path]) # String contendo arquivo para transmissão de informação
-        self.menu_str:str = "Digite a requisição [JOIN, SEARCH, DOWNLOAD, LEAVE]:"
+        self.menu_str:str = "\nDigite a requisição [JOIN, SEARCH, DOWNLOAD, LEAVE]:"
 
     def _receive_download(self):
         sender_socket, _ = self.TCPSocket.accept() 
@@ -69,7 +69,6 @@ class Peer:
                 sender_socket.sendall(bytes_read)
                 # progress_bar.update(len(bytes_read))
 
-
     def _receive(self):
         while True:
             data, _ = self.UDPClientSocket.recvfrom(self.BUFFERSIZE)
@@ -87,6 +86,9 @@ class Peer:
         if msg_type == "JOIN_OK":
             self._handle_join()
 
+        elif msg_type == "UPDATE_OK":
+            self._handle_update()
+
         elif msg_type == "LEAVE_OK":
             self._handle_leave()  # No futuro preciso desligar o client aqui
 
@@ -98,7 +100,10 @@ class Peer:
             self._handle_search(content, filename)
 
     def _handle_join(self):
-        print(f"Sou o peer [{self.PEER_ADRESS}]:{self.PEER_PORT} com arquivos {self.files}\n")
+        print(f"Sou o peer [{self.PEER_ADRESS}]:[{self.PEER_PORT}] com arquivos {self.files}\n")
+
+    def _handle_update(self):
+        print("Informações atualizadas com sucesso.")
 
     def _handle_search(self, content, filename):
         parse_msg = content.strip('[]').split()
@@ -111,7 +116,7 @@ class Peer:
         sys.exit("Desconectado")
 
     def _handle_alive(self):        
-        msg = Message("ALIVE_OK:\n", None)
+        msg = Message(content=None, msg_type="ALIVE_OK", sender=self.PEER)
         self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
 
     def _request(self):
@@ -170,7 +175,10 @@ class Peer:
                 s.connect(peer)
                 msg = Message(content=requested_file, msg_type="DOWNLOAD", sender=self.PEER)
                 s.send(msg.to_json("utf-8"))
-                answer_download = json.loads(s.recv(self.BUFFERSIZE).decode("utf-8"))
+
+                info_downlaod = s.recv(self.BUFFERSIZE).decode("utf-8")
+                print(info_downlaod)
+                answer_download = json.loads(info_downlaod)
                 filesize = answer_download["extra_info"]
                 msg_type = answer_download["msg_type"]
 
@@ -184,7 +192,12 @@ class Peer:
                                 f.write(bytes_read)
                                 progress_bar.update(len(bytes_read))
                         s.close()
+                    print(f"Arquivo {requested_file} baixado com sucesso na pasta {self.file_folder_path}")
+
+                    msg = Message(content=requested_file, msg_type="UPDATE", sender=self.PEER)
+                    self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
                     return None
+
                 else:
                     print("DOWNLOAD_RECUSADO")
 
@@ -195,17 +208,21 @@ class Peer:
 
 if __name__ == "__main__":
 
-    _, file_folder_path, port = sys.argv
-    # file_folder_path = "data/peer1"
-    
+    # Pega porta TCP do peer e folder no quais os arquivos de vídeo estão
+    _, file_folder_path, port_tcp = sys.argv
 
-    peer = Peer(file_folder_path, port)
-    print("ONLINE\n")
+    # Inicializa o peer
+    peer = Peer(file_folder_path, port_tcp)
 
-    download_thread = threading.Thread(target=peer._receive_download)
-    listening_thread = threading.Thread(target=peer._receive)
-    alive_thread = threading.Thread(target=peer._request)
+    # Defino o peer pela sua porta TCP
+    print(f"Peer ONLINE:\nIP:{peer.PEER_ADRESS}\tPORT:{peer.PEER_PORT}")
 
+    # Iniciliza thread
+    download_thread = threading.Thread(target=peer._receive_download) # Responsável pelas requisições TCP de DOWNLOAD
+    listening_thread = threading.Thread(target=peer._receive) # Responsável por qualquer requisição UDP
+    request_thread = threading.Thread(target=peer._request) # Responsável por fazer requisições
+
+    # Start as thread 
     download_thread.start()
     listening_thread.start()
-    alive_thread.start()
+    request_thread.start()

@@ -49,6 +49,9 @@ class Servidor:
 
         if msg_type == "JOIN":
             return self._handle_join(peer, peer_udp, content)
+
+        elif msg_type == "UPDATE":
+            return self._handle_update(peer, peer_udp, content)
             
         elif msg_type == "SEARCH":
             return self._handle_search(peer, peer_udp, content)
@@ -74,13 +77,20 @@ class Servidor:
             self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_udp)
             print(f"Peer [{peer[0]}]:{peer[1]} já está conectado.")
 
+    def _handle_update(self, peer, peer_udp, new_file):
+
+        if peer in self.peers:
+            self.peers[peer].append(new_file.strip()) # Retira possíveis espaços em branco do começo e final da string e adiciona na estrutura
+            msg = Message(content=None, msg_type="UPDATE_OK", sender=self.SERVER)
+            self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_udp)
+        print(f"Informações do peer [{peer[1]}]:[{peer[0]}] atualizadas com sucesso.")
+
     def _handle_search(self, sender_peer, peer_udp, content):
         """
         Encontra quais peers tem o arquivo solicitado.
         """
         filename = content.strip() # 
         print(f"Peer [{sender_peer[0]}]:[{sender_peer[1]}] solicitou arquivo {filename}")
-        print(sender_peer)
         has_peers = [f"{peer[0]}:{peer[1]}" for peer in self.peers if (filename in self.peers[peer]) and (sender_peer != peer)]
         msg = Message(content="[" + " ".join(has_peers) + "]", 
                       msg_type="SEARCH",
