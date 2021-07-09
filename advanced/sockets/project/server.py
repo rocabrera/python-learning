@@ -10,6 +10,7 @@ class Servidor:
 
     HOST = socket.gethostbyname(socket.gethostname())
     PORT = 10098
+    SERVER = (HOST, PORT)
     BUFFERSIZE = 1024
 
     def __init__(self):
@@ -21,13 +22,11 @@ class Servidor:
 
         while True:
             try:
-                data, peer = self.UDPServerSocket.recvfrom(self.BUFFERSIZE)
-
+                data, peer_udp = self.UDPServerSocket.recvfrom(self.BUFFERSIZE)
                 recv_msg = json.loads(data.decode('utf-8'))  # Transforma json em dict
-
                 # Criar uma thread para cada requisição de um cliente
                 thread = threading.Thread(
-                    target=self._handle_request, args=(peer, recv_msg))
+                    target=self._handle_request, args=(recv_msg,peer_udp))
 
                 thread.start()
                 thread.join()
@@ -43,48 +42,58 @@ class Servidor:
                 self.UDPServerSocket.close()
                 break
 
-    def _handle_request(self, peer, recv_msg):
+    def _handle_request(self, recv_msg, peer_udp):
+        peer = tuple(recv_msg["sender"])  # Peer que fez a requisição
+        msg_type = recv_msg["msg_type"]  # Tipo de requisição
+        content = recv_msg["content"]  # Conteúdo da requisição
 
-        request, msg = recv_msg["message"].split(':')
+        if msg_type == "JOIN":
+            return self._handle_join(peer, peer_udp, content)
+            
+        elif msg_type == "SEARCH":
+            return self._handle_search(peer, peer_udp, content)
 
-        if request == "JOIN":
-            print(type(recv_msg["info"]),recv_msg["info"])
-            return self._handle_join(peer, msg, recv_msg["info"])
+        elif msg_type == "LEAVE":
+            return self._handle_leave(peer, peer_udp)
 
-        elif request == "LEAVE":
-            return self._handle_leave(peer)
-
-        elif request == "SEARCH":
-            return self._handle_search(peer, msg)
-
-        elif request == "ALIVE_OK":
+        elif msg_type == "ALIVE_OK":
             self._handle_alive()
 
-    def _handle_join(self, peer, msg, port_tcp):
-        peer_address, _ = peer
-        file_lst = msg.strip()
+    def _handle_join(self, peer, peer_udp, content):
+        """
+        Grava peer na estrutura de dados do servidor somente caso não esteja conectado.
+        """
+        file_lst = content.strip() # Retira possíveis espaços em branco do começo e final da string
         if peer not in self.peers:
-            self.peers[(peer_address, port_tcp)] = file_lst.split()  # Grava o peer no servidor
-            print(f"Peer [{peer_address}]:{port_tcp} adicionado com arquivos {file_lst}")
-            msg = Message("JOIN_OK\n", "OK")
-            self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer)
+            self.peers[peer] = file_lst.split()  # Grava o peer no servidor
+            print(f"Peer [{peer[0]}]:{peer[1]} adicionado com arquivos {file_lst}")
+            msg = Message(content=None, msg_type="JOIN_OK", sender=self.SERVER)
+            self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_udp)
         else:
-            msg = Message("Você já está conectado\n", "OK")
-            self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer)
-            print(f"Peer [{peer_address}]:{port_tcp} já está conectado")
+            msg = Message(content="Você já está conectado\n", msg_type="JOIN_OK", sender=self.SERVER)
+            self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_udp)
+            print(f"Peer [{peer[0]}]:{peer[1]} já está conectado.")
 
-    def _handle_search(self, peer_request, msg):
-        filename = msg.strip()
-        print(f"Peer [{peer_request[0]}]:[{peer_request[1]}] solicitou arquivo {filename}")
-        has_peers = [f"{peer[0]}:{peer[1]}" for peer in self.peers if filename in self.peers[peer]]
-        msg = Message("[" + " ".join(has_peers) + "]", "SEARCH", filename)
-        self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_request)
+    def _handle_search(self, sender_peer, peer_udp, content):
+        """
+        Encontra quais peers tem o arquivo solicitado.
+        """
+        filename = content.strip() # 
+        print(f"Peer [{sender_peer[0]}]:[{sender_peer[1]}] solicitou arquivo {filename}")
+        print(sender_peer)
+        has_peers = [f"{peer[0]}:{peer[1]}" for peer in self.peers if (filename in self.peers[peer]) and (sender_peer != peer)]
+        msg = Message(content="[" + " ".join(has_peers) + "]", 
+                      msg_type="SEARCH",
+                      sender=self.SERVER,
+                      extra_info=filename)
 
-    def _handle_leave(self, peer):
+        self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_udp)
+
+    def _handle_leave(self, peer, peer_udp):
         if peer in self.peers:
             self.peers.pop(peer)  # Retira o peer do servidor
-            msg = Message("LEAVE_OK\n", "OK")
-            self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer)
+            msg = Message(content=None, msg_type="LEAVE_OK", sender=self.SERVER)
+            self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_udp)
 
     def _handle_alive(self):
         pass
@@ -97,7 +106,7 @@ class Servidor:
 
     def _broadcast_alive(self):
         print("Sending ALIVE")
-        msg = Message("ALIVE", "OK")
+        msg = Message(content=None, msg_type="ALIVE", sender=self.SERVER)
         # with futures.ThreadPoolExecutor(max_workers=5) as ex:
         #     results = ex.map(task, range(1, 6), timeout=3)
         for peer in self.peers:
