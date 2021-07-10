@@ -1,16 +1,18 @@
+# pacotes default do python
 import os   # Utilitys do sistema operacional
 import sys  # Para pegar folder no qual os dados estão
 import glob  # Percorre com regex os files de um folder
 import json  # Utilizado para fazer parse da mensagem
+from collections import defaultdict # Utilizado como estrutura de dados de um peer para guardar quais peers possuem quais arquivos
+import random  # Utilizado para aceitar randomicamente requisição de download
+import time  # Utilizado para ajustar prints de um peer 
+import socket  # Utilizado para criar sockets
+import threading # Utilizado para fazer as threads
+from typing import List, Dict, Tuple  # Utilizado para indicar tipos de variáveis
+
+# pacotes não default
 from tqdm import tqdm  # Utilizado para fazer barra de progresso do download
-import time
-import socket
-import threading
-
 from message import Message
-from typing import List, Dict, Tuple
-
-from collections import defaultdict
 
 
 class Peer:
@@ -43,32 +45,44 @@ class Peer:
         self.files:str = " ".join([os.path.basename(file_name) for file_name in files_path]) # String contendo arquivo para transmissão de informação
         self.menu_str:str = "\nDigite a requisição [JOIN, SEARCH, DOWNLOAD, LEAVE]:"
 
-    def _receive_download(self):
-        sender_socket, _ = self.TCPSocket.accept() 
-        # if below code is executed, that means the sender is connected
-        data = sender_socket.recv(self.BUFFERSIZE)
-        recv_msg = json.loads(data.decode('utf-8'))
-        requested_file = recv_msg["content"]
+    def _handle_download(self):
+        while True:
+            sender_socket, _ = self.TCPSocket.accept() 
+            # if below code is executed, that means the sender is connected
+            data = sender_socket.recv(self.BUFFERSIZE)
+            recv_msg = json.loads(data.decode('utf-8'))
+            requested_file = recv_msg["content"]
 
-        file_path = os.path.join(self.file_folder_path, requested_file)
+            file_path = os.path.join(self.file_folder_path, requested_file)
+            thread = threading.Thread(target=self._receive_download, args=(file_path, sender_socket,))
+            thread.start()
+            thread.join()
+
+    def _receive_download(self, file_path, sender_socket):
+
         filesize = os.path.getsize(file_path)
+        prop_accept = 0.5
+        chance_accept = random.uniform(0,1)
+        if chance_accept <= prop_accept:
+            msg = Message(content=None, msg_type="DOWNLOAD_ACEITO", sender=self.PEER, extra_info=filesize)
+            sender_socket.sendall(msg.to_json("utf-8"))
+            #with tqdm(range(filesize), f"Sending {requested_file}", unit="B", unit_scale=True, unit_divisor=1024) as progress_bar:
+            with open(file_path, "rb") as f:
+                while True:
+                    bytes_read = f.read(self.BUFFERSIZE)  # Lê bytes do arquivo
+                    if not bytes_read: 
+                        break # Transmissão do arquivo completa
 
-        msg_pos = Message(content=None, msg_type="DOWNLOAD_ACEITO", sender=self.PEER, extra_info=filesize)
-        # msg_neg = Message(content=None, msg_type="DOWNLOAD_NEGADO", sender=self.PEER, extra_info=filesize)
+                    sender_socket.sendall(bytes_read)
+                    # progress_bar.update(len(bytes_read))
+        else:
+            msg = Message(content=None, msg_type="DOWNLOAD_NEGADO", sender=self.PEER, extra_info=filesize)
+            sender_socket.sendall(msg.to_json("utf-8"))
 
-        sender_socket.sendall(msg_pos.to_json("utf-8"))
+        sender_socket.close()
 
-        #with tqdm(range(filesize), f"Sending {requested_file}", unit="B", unit_scale=True, unit_divisor=1024) as progress_bar:
-        with open(file_path, "rb") as f:
-            while True:
-                
-                bytes_read = f.read(self.BUFFERSIZE)  # Lê bytes do arquivo
-
-                if not bytes_read: break # Transmissão do arquivo completa
-
-                sender_socket.sendall(bytes_read)
-                # progress_bar.update(len(bytes_read))
-
+    
+            
     def _receive(self):
         while True:
             data, _ = self.UDPClientSocket.recvfrom(self.BUFFERSIZE)
@@ -103,7 +117,8 @@ class Peer:
         print(f"Sou o peer [{self.PEER_ADRESS}]:[{self.PEER_PORT}] com arquivos {self.files}\n")
 
     def _handle_update(self):
-        print("Informações atualizadas com sucesso.")
+        pass
+        #print("Informações atualizadas com sucesso.")
 
     def _handle_search(self, content, filename):
         parse_msg = content.strip('[]').split()
@@ -163,27 +178,27 @@ class Peer:
 
         new_file_path = os.path.join(self.file_folder_path, requested_file)
 
-        if os.path.exists(new_file_path):
-            print("Você ja possui esse arquivo.")
-            return None
+        # if os.path.exists(new_file_path):
+        #    print("Você ja possui esse arquivo.")
+        #    return None
 
-        msg = Message(content=requested_file, msg_type="DOWNLOAD", sender=self.PEER)
         for peer in self.network_peers:
             if requested_file in self.network_peers[peer]:
 
                 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
                 s.connect(peer)
                 msg = Message(content=requested_file, msg_type="DOWNLOAD", sender=self.PEER)
+                print(f"Pedindo arquivo para o Peer [{peer[0]}]:[{peer[1]}]")
                 s.send(msg.to_json("utf-8"))
 
+                # Recebe via TCP do outro peer se o download foi aceito e tamanho do arquivo solicitado
                 info_downlaod = s.recv(self.BUFFERSIZE).decode("utf-8")
-                print(info_downlaod)
                 answer_download = json.loads(info_downlaod)
-                filesize = answer_download["extra_info"]
+                filesize = int(answer_download["extra_info"])
                 msg_type = answer_download["msg_type"]
-
+                time.sleep(0.1)
                 if msg_type == "DOWNLOAD_ACEITO":
-                    with tqdm(range(int(filesize)), f"Receiving {requested_file}", unit="B", unit_scale=True, unit_divisor=1024) as progress_bar:
+                    with tqdm(range(filesize), f"Receiving {requested_file}", unit="B", unit_scale=True, unit_divisor=1024) as progress_bar:
                         with open(new_file_path, "wb") as f:
                             while True:
                                 bytes_read = s.recv(self.BUFFERSIZE)
@@ -191,15 +206,22 @@ class Peer:
                                     break
                                 f.write(bytes_read)
                                 progress_bar.update(len(bytes_read))
-                        s.close()
+
                     print(f"Arquivo {requested_file} baixado com sucesso na pasta {self.file_folder_path}")
 
                     msg = Message(content=requested_file, msg_type="UPDATE", sender=self.PEER)
                     self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
+
                     return None
 
-                else:
-                    print("DOWNLOAD_RECUSADO")
+                elif msg_type == "DOWNLOAD_NEGADO":
+                    print(f"Peer [{peer[0]}]:[{peer[1]}] negou o download.")
+
+                s.close()
+
+                
+
+                    
 
     def leave(self):
         msg = Message(content=None, msg_type="LEAVE", sender=self.PEER)
@@ -218,7 +240,7 @@ if __name__ == "__main__":
     print(f"Peer ONLINE:\nIP:{peer.PEER_ADRESS}\tPORT:{peer.PEER_PORT}")
 
     # Iniciliza thread
-    download_thread = threading.Thread(target=peer._receive_download) # Responsável pelas requisições TCP de DOWNLOAD
+    download_thread = threading.Thread(target=peer._handle_download) # Responsável pelas requisições TCP de DOWNLOAD
     listening_thread = threading.Thread(target=peer._receive) # Responsável por qualquer requisição UDP
     request_thread = threading.Thread(target=peer._request) # Responsável por fazer requisições
 

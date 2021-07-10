@@ -69,7 +69,7 @@ class Servidor:
         file_lst = content.strip() # Retira possíveis espaços em branco do começo e final da string
         if peer not in self.peers:
             self.peers[peer] = file_lst.split()  # Grava o peer no servidor
-            print(f"Peer [{peer[0]}]:{peer[1]} adicionado com arquivos {file_lst}")
+            print(f"Peer [{peer[0]}]:[{peer[1]}] adicionado com arquivos {file_lst}")
             msg = Message(content=None, msg_type="JOIN_OK", sender=self.SERVER)
             self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_udp)
         else:
@@ -83,7 +83,7 @@ class Servidor:
             self.peers[peer].append(new_file.strip()) # Retira possíveis espaços em branco do começo e final da string e adiciona na estrutura
             msg = Message(content=None, msg_type="UPDATE_OK", sender=self.SERVER)
             self.UDPServerSocket.sendto(msg.to_json("utf-8"), peer_udp)
-        print(f"Informações do peer [{peer[1]}]:[{peer[0]}] atualizadas com sucesso.")
+        #print(f"Informações do peer [{peer[1]}]:[{peer[0]}] atualizadas com sucesso.")
 
     def _handle_search(self, sender_peer, peer_udp, content):
         """
