@@ -226,6 +226,7 @@ class Peer:
     def leave(self):
         msg = Message(content=None, msg_type="LEAVE", sender=self.PEER)
         self.UDPClientSocket.sendto(msg.to_json("utf-8"), self.SERVER)
+        os._exit(os.EX_OK)
 
 
 if __name__ == "__main__":
