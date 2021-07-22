@@ -10,7 +10,7 @@ print(f"HOST: {HOST}")
 PORT = 10098
 
 """
-Usado para criar TCP socket: socket.SOCK_STREAM 
+Usado para criar TCP socket: socket.SOCK_STREAM
 Usado para criar UDP socket: socket.SOCK_DGRAM
 
 Utiliza protocolo IPv4: AF_INET
@@ -18,24 +18,26 @@ Utiliza protocolo IPv6: AF_INET6
 """
 
 server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-server.bind((HOST,PORT))
+server.bind((HOST, PORT))
 server.listen()
 
 
 clients = []
 nicknames = []
 
+
 def broadcast(message):
     for client in clients:
         client.send(message)
 
+
 def handle(client):
     while True:
         try:
-            #receives 1024 bytes
+            # receives 1024 bytes
             message = client.recv(1024)
             broadcast(message)
-        except:
+        except Exception:
             index = clients.index(client)
             clients.remove(client)
             client.close()
@@ -43,6 +45,7 @@ def handle(client):
             broadcast(f"{nickname} left the chat!".encode('ascii'))
             nicknames.remove(nickname)
             break
+
 
 def receive():
     while True:
@@ -60,7 +63,7 @@ def receive():
         broadcast(f'{nickname} joined the chat!'.encode("ascii"))
         client.send('Connected to the server!'.encode('ascii'))
 
-        thread = threading.Thread(target=handle,args=(client,))
+        thread = threading.Thread(target=handle, args=(client,))
         thread.start()
 
 
